@@ -17,8 +17,14 @@ contract CollectFund {
         uint8 interestRate;                                 //Rate of interest offered by borrower in the proposal
         uint256 fundingReached;                             //Proposal funding reached
         uint8 tenureInMonths;                               //Proposal loan duration
-        uint256 installmentStartTS;                         //If proposal goal achieved proposal start timestamp 
+        uint256 proposalSubmissionTS;                         //If proposal goal achieved proposal start timestamp 
     }
+
+    struct ProposalIDs{
+        bytes32 proposalID;
+    }
+
+    ProposalIDs[] public AllProposalIDs;
 
     /*Store lender contribution information per proposal per lender address*/
     struct LenderInfo {
@@ -31,48 +37,50 @@ contract CollectFund {
         bytes32[] proposalID;                               //Store contributed proposal ids
     }
 
-    mapping (string => BorrowerProposal) mapProposalsWithProposalIDs;                   //map proposal information with proposal ids
-    mapping (string => uint256) mapProposalWithDeadline;                                //map proposal expiration with proposal ids, default 1 day
-    mapping (address => string[]) mapBorrowerWithProposalIDs;                           //map borrower's raised porposals with his address
-    mapping (string => address) mapProposalWithOwner;                                   //map proposal ids with proposal owners/borrower's address
-    mapping (string => bool) proposalOpen;                                              //map proposal ids with activity status
-    mapping (string => mapping(address =>LenderInfo)) mapProposalWithLenderInfo;        //map proposal ids and contributer's address with contribution - 2d
-    mapping (string => address[]) mapLendersWithProposal;                               //map proposal ids with contributers
+    mapping (bytes32 => BorrowerProposal) mapProposalsWithProposalIDs;                   //map proposal information with proposal ids
+    mapping (bytes32 => uint256) mapProposalWithDeadline;                                //map proposal expiration with proposal ids, default 1 day
+    mapping (address => bytes32[]) mapBorrowerWithProposalIDs;                           //map borrower's raised porposals with his address
+    mapping (bytes32 => address) mapProposalWithOwner;                                   //map proposal ids with proposal owners/borrower's address
+    mapping (bytes32 => bool) mapProposalOpenStatusWithProposalID;                                              //map proposal ids with activity status
+    mapping (bytes32 => mapping(address =>LenderInfo)) mapProposalWithLenderInfo;        //map proposal ids and contributer's address with contribution - 2d
+    mapping (bytes32 => address[]) mapLendersWithProposal;                               //map proposal ids with contributers
     mapping (address => LenderContributions) mapProposalIDsWithLenders;                 //map contributer's information with contributed proposal ids
-    mapping (string => uint256) mapProposalIDWithNextDueDate;                           //map next instllment due date with proposal/loan ids
+    mapping (bytes32 => uint256) mapProposalIDWithNextDueDate;                           //map next instllment due date with proposal/loan ids
+    mapping (bytes32 => bool) mapProposalSuccessStatusWithProposalID;
+    mapping (bytes32 => uint256) mapProposalWithInstallmentStartTS;
 
 
     event EtherTransfer(address _from, uint256 _value);                                             
-    event GoalReached(address _proposalOwner, string _proposalID, uint256 _fundingGoal);            
-    event GetFundAfterGoalReached(address _proposalOwner, string _proposalID, uint256 _amount);
-    event WithdrawFundWhenGoalNotReached(address _lender, string _proposalID, uint256 _amount);
+    event GoalReached(address _proposalOwner, bytes32 _proposalID, uint256 _fundingGoal);            
+    event GetFundAfterGoalReached(address _proposalOwner, bytes32 _proposalID, uint256 _amount);
+    event WithdrawFundWhenGoalNotReached(address _lender, bytes32 _proposalID, uint256 _amount);
 
-    modifier checkDeadline(string _proposalID) {
+    modifier checkDeadline(bytes32 _proposalID) {
         if (now <= mapProposalWithDeadline[_proposalID])
         _;
     }
 
-    modifier afterDeadline(string _proposalID) {
+    modifier afterDeadline(bytes32 _proposalID) {
         if (now >= mapProposalWithDeadline[_proposalID])
         _;
     }
 
-    modifier checkProposalOwner(string _proposalID) {
+    modifier checkProposalOwner(bytes32 _proposalID) {
         if ( msg.sender == mapProposalWithOwner[_proposalID])
         _;
     }
 
-    modifier checkProposalStatus(string _proposalID) {
-        if ( proposalOpen[_proposalID])
+    modifier checkProposalStatus(bytes32 _proposalID) {
+        if ( mapProposalOpenStatusWithProposalID[_proposalID])
         _;
     }
 
-    modifier proposalGoalReached(string _proposalID) {
-        if ( !proposalOpen[_proposalID])
+    modifier proposalGoalReached(bytes32 _proposalID) {
+        if ( !mapProposalOpenStatusWithProposalID[_proposalID])
         _;
     }
 
-    modifier fundingOverflow(string _proposalID, uint256 _amount) {
+    modifier fundingOverflow(bytes32 _proposalID, uint256 _amount) {
         if (_amount <= (mapProposalsWithProposalIDs[_proposalID].fundingGoal - mapProposalsWithProposalIDs[_proposalID].fundingReached))
         _;
     }
@@ -88,16 +96,18 @@ contract CollectFund {
     }
 
     /*Borrower proposal submission with generated proposal id, proposal funding goal, rate of interest and loan tenure */
-    function submitProposal(string _proposalID, uint256 _fundingGoal, uint8 _interestRate, uint8 _tenureInMonths) external {
-        mapProposalsWithProposalIDs[_proposalID] = BorrowerProposal(_fundingGoal,_interestRate,0, _tenureInMonths,0);
+    function submitProposal(bytes32 _proposalID, uint256 _fundingGoal, uint8 _interestRate, uint8 _tenureInMonths) external {
+        mapProposalsWithProposalIDs[_proposalID] = BorrowerProposal(_fundingGoal,_interestRate,0, _tenureInMonths,now);
         mapBorrowerWithProposalIDs[msg.sender].push(_proposalID);
         mapProposalWithDeadline[_proposalID] = now+deadline;
         mapProposalWithOwner[_proposalID] = msg.sender;
-        proposalOpen[_proposalID] = true;
+        mapProposalOpenStatusWithProposalID[_proposalID] = true;
+        mapProposalSuccessStatusWithProposalID[_proposalID] = false;
+        AllProposalIDs.push(ProposalIDs(_proposalID)); 
     }
 
     /*Lend Ethers to proposal by proposal id*/
-    function lendMoneyToProposal(string _proposalID, bytes32 _proposalId) payable fundingOverflow(_proposalID,msg.value) checkDeadline(_proposalID) checkProposalStatus(_proposalID) external {
+    function lendMoneyToProposal(bytes32 _proposalID) payable fundingOverflow(_proposalID,msg.value) checkDeadline(_proposalID) checkProposalStatus(_proposalID) external {
         if (msg.value > 0 ) {
             BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
             currentProposal.fundingReached = SafeMath.add(currentProposal.fundingReached,msg.value);
@@ -106,18 +116,19 @@ contract CollectFund {
             currentLender.fundRatio = uint8(SafeMath.div((SafeMath.mul(msg.value, 100)),(currentProposal.fundingGoal)));
             mapProposalWithLenderInfo[_proposalID][msg.sender] = currentLender;
             mapLendersWithProposal[_proposalID].push(msg.sender);
-            mapProposalIDsWithLenders[msg.sender].proposalID.push(_proposalId);       
+            mapProposalIDsWithLenders[msg.sender].proposalID.push(_proposalID);       
             EtherTransfer(msg.sender,msg.value);
         }
     }
 
     /*Admin to close proposal after deadline and successful funding*/
-    function reachedGoal(string _proposalID) onlyAdmin afterDeadline(_proposalID) external {
+    function reachedGoal(bytes32 _proposalID) onlyAdmin afterDeadline(_proposalID) external {
         BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
         if (currentProposal.fundingReached == currentProposal.fundingGoal) {
-            proposalOpen[_proposalID] == false;
-            currentProposal.installmentStartTS = now;
+            mapProposalOpenStatusWithProposalID[_proposalID] == false;
+            mapProposalWithInstallmentStartTS[_proposalID] = now;
             setNextDueDate(_proposalID);
+            mapProposalSuccessStatusWithProposalID[_proposalID] = true;
             GoalReached(mapProposalWithOwner[_proposalID], _proposalID, currentProposal.fundingGoal);
         }
         else{
@@ -127,7 +138,7 @@ contract CollectFund {
     }
 
     /*Contract internal function to set next installment due date*/
-    function setNextDueDate(string _proposalID) internal {
+    function setNextDueDate(bytes32 _proposalID) internal {
         uint256 installmentStart = getInstallmentStartTS(_proposalID);
         if (mapProposalIDWithNextDueDate[_proposalID] == 0){
             mapProposalIDWithNextDueDate[_proposalID] = installmentStart + duePeriod;
@@ -137,8 +148,19 @@ contract CollectFund {
         }
     }
 
+    function getProposalDetailsByProposalID(bytes32 _proposalID) external view returns(uint256,uint8,uint256,uint8,uint256,uint256,bool,bool){
+        return (mapProposalsWithProposalIDs[_proposalID].fundingGoal,
+        mapProposalsWithProposalIDs[_proposalID].interestRate,
+        mapProposalsWithProposalIDs[_proposalID].fundingReached,
+        mapProposalsWithProposalIDs[_proposalID].tenureInMonths,
+        mapProposalsWithProposalIDs[_proposalID].proposalSubmissionTS,
+        mapProposalWithInstallmentStartTS[_proposalID],
+        mapProposalSuccessStatusWithProposalID[_proposalID],
+        mapProposalOpenStatusWithProposalID[_proposalID]);
+    }
+
     /*Get installment due date by proposal/loan id*/
-    function getProposalDueDate(string _proposalID) view returns(uint256) {
+    function getProposalDueDate(bytes32 _proposalID) view returns(uint256) {
         if (mapProposalIDWithNextDueDate[_proposalID] == 0){
             return getInstallmentStartTS(_proposalID);
         }
@@ -148,7 +170,7 @@ contract CollectFund {
     }
 
     /*Get days left in installment due date by proposal/loan id*/
-    function getDaysRemainingInInstallmentDue(string _proposalID) view returns(uint256) {
+    function getDaysRemainingInInstallmentDue(bytes32 _proposalID) view returns(uint256) {
         if (getProposalDueDate(_proposalID) > now) {
             return (getProposalDueDate(_proposalID) - now);
         }
@@ -158,7 +180,7 @@ contract CollectFund {
     }
 
     /*Get funding as borrower if proposal was successful to be triggered by proposal owner by proposal id*/
-    function getMoneyAsBorrowerAfterDeadline(string _proposalID) payable afterDeadline(_proposalID) proposalGoalReached(_proposalID) checkProposalOwner(_proposalID) external {
+    function getMoneyAsBorrowerAfterDeadline(bytes32 _proposalID) payable afterDeadline(_proposalID) proposalGoalReached(_proposalID) checkProposalOwner(_proposalID) external {
         address proposalOwner = mapProposalWithOwner[_proposalID];
         BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
         if (proposalOwner.send(currentProposal.fundingGoal)) {
@@ -167,27 +189,31 @@ contract CollectFund {
     }
 
     /*Get proposal submission timestamp by proposal id */
-    function getProposalStartTS(string _proposalID) view external returns(uint256) {
+    function getProposalStartTS(bytes32 _proposalID) view external returns(uint256) {
         return mapProposalsWithProposalIDs[_proposalID].installmentStartTS;
 
     }
 
     /*Check funding reached by proposal id*/
-    function checkProposalFunding(string _proposalID) view external returns(uint256){
+    function checkProposalFunding(bytes32 _proposalID) view external returns(uint256){
         return (mapProposalsWithProposalIDs[_proposalID].fundingReached);
     }
 
     /* */
-    function getProposalExpiration(string _proposalID) view external returns(uint256){
+    function getProposalExpiration(bytes32 _proposalID) view external returns(uint256){
         return mapProposalWithDeadline[_proposalID];
     }
 
-    function getProposalLenders(string _proposalID) view external returns(address[]){
+    function getProposalLenders(bytes32 _proposalID) view external returns(address[]){
         return (mapLendersWithProposal[_proposalID]);
     }
 
-    function getLenderDetails(string _proposalID, address _lender) view external returns(uint256, uint8) {
+    function getLenderDetails(bytes32 _proposalID, address _lender) view external returns(uint256, uint8) {
     return (mapProposalWithLenderInfo[_proposalID][_lender].amount, mapProposalWithLenderInfo[_proposalID][_lender].fundRatio);
+    }
+
+    function getAllProposals() view external returns(bytes32[]) {
+        return (AllProposals.proposalID);
     }
 
     function getLenderProposals() view external returns(bytes32[]) {
@@ -196,7 +222,7 @@ contract CollectFund {
         return (lenderContributedProposals);
     }
 
-    function getInstallmentStartTS(string _proposalID) view proposalGoalReached(_proposalID) returns(uint256) {
+    function getInstallmentStartTS(bytes32 _proposalID) view proposalGoalReached(_proposalID) returns(uint256) {
         return (mapProposalsWithProposalIDs[_proposalID].installmentStartTS);
     }
 
