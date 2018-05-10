@@ -6,15 +6,13 @@ import "./CollectFund.sol";
 
 contract PayInstallments is CollectFund {
     
-    uint duePeriod = 30 days;
-    uint i = 0;
+    uint256 i = 0;
+    uint256 lateInstallmentFee;
 
     struct Installment {
         uint256 installmentAmount;
         uint8 remainingTenure;
     }
-
-
 
     mapping (string => Installment ) mapInstallmentsWithProposal;
 
@@ -25,29 +23,40 @@ contract PayInstallments is CollectFund {
         _;
     }
 
-    modifier checkNextDue(string _proposalID) {
-        
+    function setLateInstallmentFee (uint256 _amount) onlyAdmin {
+        lateInstallmentFee = _amount;
     }
     
-    function calculateInstallment (string _proposalID) returns (uint256 _installmentAmount, uint8 _tenure) {
+    function calculateInstallment (string _proposalID) returns (uint256 _installmentAmount) {
         BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
         uint256 installmentAmount = EMICalculator.calculateInstallment(currentProposal.fundingGoal, currentProposal.interestRate, currentProposal.tenureInMonths);
         mapInstallmentsWithProposal[_proposalID] = Installment(installmentAmount, currentProposal.tenureInMonths);
+        return mapInstallmentsWithProposal[_proposalID].installmentAmount;
+    }
+
+    function getDueInstallment(string _proposalID) view returns (uint256 _installment) { 
+        if (getDaysRemainingInInstallmentDue(_proposalID) > 0) {
+            return mapInstallmentsWithProposal[_proposalID].installmentAmount;
+        }
+        else {
+            return (mapInstallmentsWithProposal[_proposalID].installmentAmount + lateInstallmentFee);
+        }
     }
 
     function payInstallment(string _proposalID) payable checkProposalOwner(_proposalID) checkInstallmentTenure(_proposalID) {
         Installment storage currentInstallment = mapInstallmentsWithProposal[_proposalID];
         LenderInfo storage currentLenderInfo;
-
-        for (i = 0; i < mapLendersWithProposal[_proposalID].length ; i++) {
+        if (msg.value == getDueInstallment(_proposalID)){
+            for (i = 0; i < mapLendersWithProposal[_proposalID].length ; i++) {
             address currentLender = mapLendersWithProposal[_proposalID][i];
             currentLenderInfo = mapProposalWithLenderInfo[_proposalID][currentLender];
             uint256 amount = SafeMath.div((SafeMath.mul(currentInstallment.installmentAmount, currentLenderInfo.fundRatio)), 100);
             if (currentLender.send(amount)) {
                 InstallmentTransfer(_proposalID, amount, mapProposalWithOwner[_proposalID], currentLender);
+                setNextDueDate(_proposalID);
+               }
             }
         }
-
     }
 
 }

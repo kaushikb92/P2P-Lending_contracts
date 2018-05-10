@@ -1,0 +1,119 @@
+{
+  "contractName": "InstallmentDueDate",
+  "abi": [],
+  "bytecode": "0x6080604052348015600f57600080fd5b50603580601d6000396000f3006080604052600080fd00a165627a7a72305820e2f774a0736acf957de6c1003dd020607c5051e0d89c5a82e506274f0a955de30029",
+  "deployedBytecode": "0x6080604052600080fd00a165627a7a72305820e2f774a0736acf957de6c1003dd020607c5051e0d89c5a82e506274f0a955de30029",
+  "sourceMap": "63:38:2:-;;;;8:9:-1;5:2;;;30:1;27;20:12;5:2;63:38:2;;;;;;;",
+  "deployedSourceMap": "63:38:2:-;;;;;",
+  "source": "pragma solidity ^0.4.19;\r\n\r\nimport \"./PayInstallments.sol\";\r\n\r\ncontract InstallmentDueDate {\r\n    \r\n}",
+  "sourcePath": "D:\\work\\P2P-Lending\\WithSafeMath\\contracts\\InstallmentDueDate.sol",
+  "ast": {
+    "absolutePath": "/D/work/P2P-Lending/WithSafeMath/contracts/InstallmentDueDate.sol",
+    "exportedSymbols": {
+      "InstallmentDueDate": [
+        714
+      ]
+    },
+    "id": 715,
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 712,
+        "literals": [
+          "solidity",
+          "^",
+          "0.4",
+          ".19"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "0:24:2"
+      },
+      {
+        "absolutePath": "/D/work/P2P-Lending/WithSafeMath/contracts/PayInstallments.sol",
+        "file": "./PayInstallments.sol",
+        "id": 713,
+        "nodeType": "ImportDirective",
+        "scope": 715,
+        "sourceUnit": 936,
+        "src": "28:31:2",
+        "symbolAliases": [],
+        "unitAlias": ""
+      },
+      {
+        "baseContracts": [],
+        "contractDependencies": [],
+        "contractKind": "contract",
+        "documentation": null,
+        "fullyImplemented": true,
+        "id": 714,
+        "linearizedBaseContracts": [
+          714
+        ],
+        "name": "InstallmentDueDate",
+        "nodeType": "ContractDefinition",
+        "nodes": [],
+        "scope": 715,
+        "src": "63:38:2"
+      }
+    ],
+    "src": "0:101:2"
+  },
+  "legacyAST": {
+    "absolutePath": "/D/work/P2P-Lending/WithSafeMath/contracts/InstallmentDueDate.sol",
+    "exportedSymbols": {
+      "InstallmentDueDate": [
+        714
+      ]
+    },
+    "id": 715,
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 712,
+        "literals": [
+          "solidity",
+          "^",
+          "0.4",
+          ".19"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "0:24:2"
+      },
+      {
+        "absolutePath": "/D/work/P2P-Lending/WithSafeMath/contracts/PayInstallments.sol",
+        "file": "./PayInstallments.sol",
+        "id": 713,
+        "nodeType": "ImportDirective",
+        "scope": 715,
+        "sourceUnit": 936,
+        "src": "28:31:2",
+        "symbolAliases": [],
+        "unitAlias": ""
+      },
+      {
+        "baseContracts": [],
+        "contractDependencies": [],
+        "contractKind": "contract",
+        "documentation": null,
+        "fullyImplemented": true,
+        "id": 714,
+        "linearizedBaseContracts": [
+          714
+        ],
+        "name": "InstallmentDueDate",
+        "nodeType": "ContractDefinition",
+        "nodes": [],
+        "scope": 715,
+        "src": "63:38:2"
+      }
+    ],
+    "src": "0:101:2"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.4.23+commit.124ca40d.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "2.0.0",
+  "updatedAt": "2018-05-10T09:59:50.976Z"
+}
