@@ -14,27 +14,27 @@ contract PayInstallments is CollectFund {
         uint8 remainingTenure;
     }
 
-    mapping (string => Installment ) mapInstallmentsWithProposal;
+    mapping (bytes32 => Installment ) mapInstallmentsWithProposal;
 
-    event InstallmentTransfer(string _proposalID, uint256 _amount, address _from, address _to );
+    event InstallmentTransfer(bytes32 _proposalID, uint256 _amount, address _from, address _to );
 
-    modifier checkInstallmentTenure(string _proposalID) {
+    modifier checkInstallmentTenure(bytes32 _proposalID) {
         if ( mapInstallmentsWithProposal[_proposalID].remainingTenure > 0) 
         _;
-    }
+    }   
 
     function setLateInstallmentFee (uint256 _amount) onlyAdmin {
         lateInstallmentFee = _amount;
     }
     
-    function calculateInstallment (string _proposalID) returns (uint256 _installmentAmount) {
+    function calculateInstallment (bytes32 _proposalID) returns (uint256 _installmentAmount) {
         BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
         uint256 installmentAmount = EMICalculator.calculateInstallment(currentProposal.fundingGoal, currentProposal.interestRate, currentProposal.tenureInMonths);
         mapInstallmentsWithProposal[_proposalID] = Installment(installmentAmount, currentProposal.tenureInMonths);
         return mapInstallmentsWithProposal[_proposalID].installmentAmount;
     }
 
-    function getDueInstallment(string _proposalID) view returns (uint256 _installment) { 
+    function getDueInstallment(bytes32 _proposalID) view returns (uint256 _installment) { 
         if (getDaysRemainingInInstallmentDue(_proposalID) > 0) {
             return mapInstallmentsWithProposal[_proposalID].installmentAmount;
         }
@@ -43,7 +43,7 @@ contract PayInstallments is CollectFund {
         }
     }
 
-    function payInstallment(string _proposalID) payable checkProposalOwner(_proposalID) checkInstallmentTenure(_proposalID) {
+    function payInstallment(bytes32 _proposalID) payable checkProposalOwner(_proposalID) checkInstallmentTenure(_proposalID) {
         Installment storage currentInstallment = mapInstallmentsWithProposal[_proposalID];
         LenderInfo storage currentLenderInfo;
         if (msg.value == getDueInstallment(_proposalID)){

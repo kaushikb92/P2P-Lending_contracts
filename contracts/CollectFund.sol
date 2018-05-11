@@ -122,7 +122,7 @@ contract CollectFund {
     }
 
     /*Admin to close proposal after deadline and successful funding*/
-    function reachedGoal(bytes32 _proposalID) onlyAdmin afterDeadline(_proposalID) external {
+    function checkGoalReached(bytes32 _proposalID) onlyAdmin afterDeadline(_proposalID) external {
         BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
         if (currentProposal.fundingReached == currentProposal.fundingGoal) {
             mapProposalOpenStatusWithProposalID[_proposalID] == false;
@@ -132,7 +132,8 @@ contract CollectFund {
             GoalReached(mapProposalWithOwner[_proposalID], _proposalID, currentProposal.fundingGoal);
         }
         else{
-            throw;
+            mapProposalOpenStatusWithProposalID[_proposalID] == false;
+            mapProposalSuccessStatusWithProposalID[_proposalID] == false;
         }
 
     }
@@ -148,13 +149,12 @@ contract CollectFund {
         }
     }
 
-    function getProposalDetailsByProposalID(bytes32 _proposalID) external view returns(uint256,uint8,uint256,uint8,uint256,uint256,bool,bool){
+    function getProposalDetailsByProposalID(bytes32 _proposalID) external view returns(uint256,uint8,uint256,uint8,uint256,bool,bool) {
         return (mapProposalsWithProposalIDs[_proposalID].fundingGoal,
         mapProposalsWithProposalIDs[_proposalID].interestRate,
         mapProposalsWithProposalIDs[_proposalID].fundingReached,
         mapProposalsWithProposalIDs[_proposalID].tenureInMonths,
         mapProposalsWithProposalIDs[_proposalID].proposalSubmissionTS,
-        mapProposalWithInstallmentStartTS[_proposalID],
         mapProposalSuccessStatusWithProposalID[_proposalID],
         mapProposalOpenStatusWithProposalID[_proposalID]);
     }
@@ -188,42 +188,68 @@ contract CollectFund {
         }
     }
 
-    /*Get proposal submission timestamp by proposal id */
-    function getProposalStartTS(bytes32 _proposalID) view external returns(uint256) {
-        return mapProposalsWithProposalIDs[_proposalID].installmentStartTS;
-
-    }
-
     /*Check funding reached by proposal id*/
-    function checkProposalFunding(bytes32 _proposalID) view external returns(uint256){
+    function checkProposalFunding(bytes32 _proposalID) view external returns(uint256) {
         return (mapProposalsWithProposalIDs[_proposalID].fundingReached);
     }
 
     /* */
-    function getProposalExpiration(bytes32 _proposalID) view external returns(uint256){
+    function getProposalExpiration(bytes32 _proposalID) view external returns(uint256) {
         return mapProposalWithDeadline[_proposalID];
     }
 
-    function getProposalLenders(bytes32 _proposalID) view external returns(address[]){
-        return (mapLendersWithProposal[_proposalID]);
+    function getProposalLendersWithDetails(bytes32 _proposalID) view external returns(address[],uint256[], uint8[]) {
+        length = mapLendersWithProposal[_proposalID].length;
+        address[] memory lenderAddresses = new address[](length);
+        uint256[] memory lenderContributions = new uint256[](length);
+        uint8[] memory lenderFundRatios = new uint8[](length);
+        lenderAddresses = mapLendersWithProposal[_proposalID];
+        for ( i = 0 ; i < length; i++) {
+            address currentLender = lenderAddresses[i];
+            lenderContributions[i] = mapProposalWithLenderInfo[_proposalID][currentLender].amount;
+            lenderFundRatios[i] = mapProposalWithLenderInfo[_proposalID][currentLender].fundRatio;
+        }
+        return (lenderAddresses,lenderContributions,lenderFundRatios);
     }
 
     function getLenderDetails(bytes32 _proposalID, address _lender) view external returns(uint256, uint8) {
     return (mapProposalWithLenderInfo[_proposalID][_lender].amount, mapProposalWithLenderInfo[_proposalID][_lender].fundRatio);
     }
 
-    function getAllProposals() view external returns(bytes32[]) {
-        return (AllProposals.proposalID);
+    function getBorrrowerSpecificProposals() view external returns(bytes32[]) {
+        return (mapBorrowerWithProposalIDs[msg.sender]);
     }
 
-    function getLenderProposals() view external returns(bytes32[]) {
-        bytes32[] memory lenderContributedProposals = new bytes32[](mapProposalIDsWithLenders[msg.sender].proposalID.length);
+    function getAllProposalsForBorrowerList() view external returns(bytes32[]) {
+        length = AllProposalIDs.length;
+        bytes32[] activeProposals;
+        for (i = 0; i < length; i++) {
+            ProposalIDs memory currentProposalID;
+            currentProposalID = AllProposalIDs[i];
+            if (mapProposalOpenStatusWithProposalID[currentProposalID.proposalID]) {
+                activeProposals.push(currentProposalID.proposalID);
+            }
+        }
+        return (activeProposals);
+    }
+
+    function getLenderSuccessfulProposals() view external returns(bytes32[]) {
+        length = mapProposalIDsWithLenders[msg.sender].proposalID.length;
+        bytes32[] memory lenderContributedProposals = new bytes32[](length);
+        bytes32[] successfulProposals;
         lenderContributedProposals = mapProposalIDsWithLenders[msg.sender].proposalID;
-        return (lenderContributedProposals);
+        for (i = 0; i < length; i++ ) {
+            bytes32 currentProposalID = lenderContributedProposals[i];
+            if (mapProposalSuccessStatusWithProposalID[currentProposalID]) {
+                successfulProposals.push(currentProposalID);
+            }
+        }
+        return (successfulProposals);
     }
 
+    /*Get proposal submission timestamp by proposal id */
     function getInstallmentStartTS(bytes32 _proposalID) view proposalGoalReached(_proposalID) returns(uint256) {
-        return (mapProposalsWithProposalIDs[_proposalID].installmentStartTS);
+        return (mapProposalWithInstallmentStartTS[_proposalID]);
     }
 
 }
