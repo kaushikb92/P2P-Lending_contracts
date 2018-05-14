@@ -96,28 +96,28 @@ contract CollectFund {
     }
 
     /*Borrower proposal submission with generated proposal id, proposal funding goal, rate of interest and loan tenure */
-    function submitProposal(bytes32 _proposalID, uint256 _fundingGoal, uint8 _interestRate, uint8 _tenureInMonths) external {
+    function submitProposal(bytes32 _proposalID, uint256 _fundingGoal, uint8 _interestRate, uint8 _tenureInMonths, address _borrower) external {
         mapProposalsWithProposalIDs[_proposalID] = BorrowerProposal(_fundingGoal,_interestRate,0, _tenureInMonths,now);
-        mapBorrowerWithProposalIDs[msg.sender].push(_proposalID);
+        mapBorrowerWithProposalIDs[_borrower].push(_proposalID);
         mapProposalWithDeadline[_proposalID] = now+deadline;
-        mapProposalWithOwner[_proposalID] = msg.sender;
+        mapProposalWithOwner[_proposalID] = _borrower;
         mapProposalOpenStatusWithProposalID[_proposalID] = true;
         mapProposalSuccessStatusWithProposalID[_proposalID] = false;
         AllProposalIDs.push(ProposalIDs(_proposalID)); 
     }
 
     /*Lend Ethers to proposal by proposal id*/
-    function lendMoneyToProposal(bytes32 _proposalID) payable fundingOverflow(_proposalID,msg.value) checkDeadline(_proposalID) checkProposalStatus(_proposalID) external {
+    function lendMoneyToProposal(bytes32 _proposalID, uint256 _amount, address _lender) payable fundingOverflow(_proposalID,_amount) checkDeadline(_proposalID) checkProposalStatus(_proposalID) external {
         if (msg.value > 0 ) {
             BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
-            currentProposal.fundingReached = SafeMath.add(currentProposal.fundingReached,msg.value);
+            currentProposal.fundingReached = SafeMath.add(currentProposal.fundingReached,_amount);
             LenderInfo memory currentLender;
-            currentLender.amount = msg.value;
-            currentLender.fundRatio = uint8(SafeMath.div((SafeMath.mul(msg.value, 100)),(currentProposal.fundingGoal)));
-            mapProposalWithLenderInfo[_proposalID][msg.sender] = currentLender;
-            mapLendersWithProposal[_proposalID].push(msg.sender);
-            mapProposalIDsWithLenders[msg.sender].proposalID.push(_proposalID);       
-            EtherTransfer(msg.sender,msg.value);
+            currentLender.amount = _amount;
+            currentLender.fundRatio = uint8(SafeMath.div((SafeMath.mul(_amount, 100)),(currentProposal.fundingGoal)));
+            mapProposalWithLenderInfo[_proposalID][_lender] = currentLender;
+            mapLendersWithProposal[_proposalID].push(_lender);
+            mapProposalIDsWithLenders[_lender].proposalID.push(_proposalID);       
+            EtherTransfer(_lender,_amount);
         }
     }
 
@@ -169,6 +169,24 @@ contract CollectFund {
         }
     }
 
+    function getProposalTenure(bytes32 _proposalID) view internal returns(uint8) {
+        return mapProposalsWithProposalIDs[_proposalID].tenureInMonths;
+    }
+
+    function getBorrowerSuccessfulProposals(address _borrower) view returns(bytes32[]) {
+        length = mapBorrowerWithProposalIDs[_borrower].length;
+        bytes32[] memory proposalIDs = new bytes32[](length);
+        bytes32[] memory successfulProposals = new bytes32[](length);
+        proposalIDs = mapBorrowerWithProposalIDs[_borrower];
+        for (i = 0; i < length; i++) {
+            bytes32 currentProposalID = proposalIDs[i];
+            if (mapProposalSuccessStatusWithProposalID[currentProposalID]) {
+                successfulProposals[i] = currentProposalID;
+            }
+        }
+        return (successfulProposals);
+    }
+
     /*Get days left in installment due date by proposal/loan id*/
     function getDaysRemainingInInstallmentDue(bytes32 _proposalID) view returns(uint256) {
         if (getProposalDueDate(_proposalID) > now) {
@@ -198,6 +216,10 @@ contract CollectFund {
         return mapProposalWithDeadline[_proposalID];
     }
 
+    function getProposalOwner(bytes32 _proposalID) view external returns(address) {
+        return mapProposalWithOwner[_proposalID];
+    }
+
     function getProposalLendersWithDetails(bytes32 _proposalID) view external returns(address[],uint256[], uint8[]) {
         length = mapLendersWithProposal[_proposalID].length;
         address[] memory lenderAddresses = new address[](length);
@@ -216,32 +238,32 @@ contract CollectFund {
     return (mapProposalWithLenderInfo[_proposalID][_lender].amount, mapProposalWithLenderInfo[_proposalID][_lender].fundRatio);
     }
 
-    function getBorrrowerSpecificProposals() view external returns(bytes32[]) {
-        return (mapBorrowerWithProposalIDs[msg.sender]);
+    function getBorrrowerSpecificProposals(address _borrower) view external returns(bytes32[]) {
+        return (mapBorrowerWithProposalIDs[_borrower]);
     }
 
     function getAllProposalsForBorrowerList() view external returns(bytes32[]) {
         length = AllProposalIDs.length;
-        bytes32[] activeProposals;
+        bytes32[] memory activeProposals = new bytes32[](length);
         for (i = 0; i < length; i++) {
             ProposalIDs memory currentProposalID;
             currentProposalID = AllProposalIDs[i];
             if (mapProposalOpenStatusWithProposalID[currentProposalID.proposalID]) {
-                activeProposals.push(currentProposalID.proposalID);
+                activeProposals[i] = currentProposalID.proposalID;
             }
         }
         return (activeProposals);
     }
 
-    function getLenderSuccessfulProposals() view external returns(bytes32[]) {
-        length = mapProposalIDsWithLenders[msg.sender].proposalID.length;
+    function getLenderSuccessfulProposals(address _lender) view external returns(bytes32[]) {
+        length = mapProposalIDsWithLenders[_lender].proposalID.length;
         bytes32[] memory lenderContributedProposals = new bytes32[](length);
-        bytes32[] successfulProposals;
-        lenderContributedProposals = mapProposalIDsWithLenders[msg.sender].proposalID;
+        bytes32[] memory successfulProposals = new bytes32[](length);
+        lenderContributedProposals = mapProposalIDsWithLenders[_lender].proposalID;
         for (i = 0; i < length; i++ ) {
             bytes32 currentProposalID = lenderContributedProposals[i];
             if (mapProposalSuccessStatusWithProposalID[currentProposalID]) {
-                successfulProposals.push(currentProposalID);
+                successfulProposals[i] = currentProposalID;
             }
         }
         return (successfulProposals);

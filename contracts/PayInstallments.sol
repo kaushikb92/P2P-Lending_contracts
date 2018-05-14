@@ -34,19 +34,21 @@ contract PayInstallments is CollectFund {
         return mapInstallmentsWithProposal[_proposalID].installmentAmount;
     }
 
-    function getDueInstallment(bytes32 _proposalID) view returns (uint256 _installment) { 
+    function getDueInstallment(bytes32 _proposalID) view returns (uint256 _installment, uint256 _nextDueDate, uint8 _remainingTenure) { 
         if (getDaysRemainingInInstallmentDue(_proposalID) > 0) {
-            return mapInstallmentsWithProposal[_proposalID].installmentAmount;
+            return (mapInstallmentsWithProposal[_proposalID].installmentAmount,getProposalDueDate(_proposalID),getProposalTenure(_proposalID)) ;
         }
         else {
-            return (mapInstallmentsWithProposal[_proposalID].installmentAmount + lateInstallmentFee);
+            return ((mapInstallmentsWithProposal[_proposalID].installmentAmount + lateInstallmentFee),getProposalDueDate(_proposalID),getProposalTenure(_proposalID));
         }
     }
 
-    function payInstallment(bytes32 _proposalID) payable checkProposalOwner(_proposalID) checkInstallmentTenure(_proposalID) {
+    function payInstallment(bytes32 _proposalID) payable checkProposalOwner(_proposalID) checkInstallmentTenure(_proposalID) proposalGoalReached(_proposalID) {
         Installment storage currentInstallment = mapInstallmentsWithProposal[_proposalID];
         LenderInfo storage currentLenderInfo;
-        if (msg.value == getDueInstallment(_proposalID)){
+        uint256 getCurrentInstallment;
+        (getCurrentInstallment,,) = getDueInstallment(_proposalID);
+        if (msg.value == getCurrentInstallment) {
             for (i = 0; i < mapLendersWithProposal[_proposalID].length ; i++) {
             address currentLender = mapLendersWithProposal[_proposalID][i];
             currentLenderInfo = mapProposalWithLenderInfo[_proposalID][currentLender];
@@ -54,6 +56,12 @@ contract PayInstallments is CollectFund {
             if (currentLender.send(amount)) {
                 InstallmentTransfer(_proposalID, amount, mapProposalWithOwner[_proposalID], currentLender);
                 setNextDueDate(_proposalID);
+                if (currentInstallment.remainingTenure == 0){
+                    currentInstallment.remainingTenure = getProposalTenure(_proposalID) - 1;
+                }
+                else {
+                    currentInstallment.remainingTenure -= 1;
+                }
                }
             }
         }
