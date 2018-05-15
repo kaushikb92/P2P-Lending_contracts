@@ -55,13 +55,13 @@ contract CollectFund {
     event GetFundAfterGoalReached(address _proposalOwner, bytes32 _proposalID, uint256 _amount);
     event WithdrawFundWhenGoalNotReached(address _lender, bytes32 _proposalID, uint256 _amount);
 
-    modifier checkDeadline(bytes32 _proposalID) {
-        if (now <= mapProposalWithDeadline[_proposalID])
+    modifier checkDeadline(bytes32 _proposalID, uint256 _ts) {
+        if (_ts <= mapProposalWithDeadline[_proposalID])
         _;
     }
 
-    modifier afterDeadline(bytes32 _proposalID) {
-        if (now >= mapProposalWithDeadline[_proposalID])
+    modifier afterDeadline(bytes32 _proposalID, uint256 _ts) {
+        if (_ts >= mapProposalWithDeadline[_proposalID])
         _;
     }
 
@@ -96,10 +96,10 @@ contract CollectFund {
     }
 
     /*Borrower proposal submission with generated proposal id, proposal funding goal, rate of interest and loan tenure */
-    function submitProposal(bytes32 _proposalID, uint256 _fundingGoal, uint8 _interestRate, uint8 _tenureInMonths, address _borrower) external {
-        mapProposalsWithProposalIDs[_proposalID] = BorrowerProposal(_fundingGoal,_interestRate,0, _tenureInMonths,now);
+    function submitProposal(bytes32 _proposalID, uint256 _fundingGoal, uint8 _interestRate, uint8 _tenureInMonths, address _borrower, uint256 _ts) external {
+        mapProposalsWithProposalIDs[_proposalID] = BorrowerProposal(_fundingGoal,_interestRate,0, _tenureInMonths,_ts);
         mapBorrowerWithProposalIDs[_borrower].push(_proposalID);
-        mapProposalWithDeadline[_proposalID] = now+deadline;
+        mapProposalWithDeadline[_proposalID] = _ts+deadline;
         mapProposalWithOwner[_proposalID] = _borrower;
         mapProposalOpenStatusWithProposalID[_proposalID] = true;
         mapProposalSuccessStatusWithProposalID[_proposalID] = false;
@@ -107,7 +107,7 @@ contract CollectFund {
     }
 
     /*Lend Ethers to proposal by proposal id*/
-    function lendMoneyToProposal(bytes32 _proposalID, uint256 _amount, address _lender) payable fundingOverflow(_proposalID,_amount) checkDeadline(_proposalID) checkProposalStatus(_proposalID) external {
+    function lendMoneyToProposal(bytes32 _proposalID, uint256 _amount, address _lender, uint256 _ts) payable fundingOverflow(_proposalID,_amount) checkDeadline(_proposalID,_ts) checkProposalStatus(_proposalID) external {
         if (msg.value > 0 ) {
             BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
             currentProposal.fundingReached = SafeMath.add(currentProposal.fundingReached,_amount);
@@ -122,11 +122,11 @@ contract CollectFund {
     }
 
     /*Admin to close proposal after deadline and successful funding*/
-    function checkGoalReached(bytes32 _proposalID) onlyAdmin afterDeadline(_proposalID) external {
+    function checkGoalReached(bytes32 _proposalID, uint256 _ts) onlyAdmin afterDeadline(_proposalID,_ts) external {
         BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
         if (currentProposal.fundingReached == currentProposal.fundingGoal) {
             mapProposalOpenStatusWithProposalID[_proposalID] == false;
-            mapProposalWithInstallmentStartTS[_proposalID] = now;
+            mapProposalWithInstallmentStartTS[_proposalID] = _ts;
             setNextDueDate(_proposalID);
             mapProposalSuccessStatusWithProposalID[_proposalID] = true;
             GoalReached(mapProposalWithOwner[_proposalID], _proposalID, currentProposal.fundingGoal);
@@ -188,9 +188,9 @@ contract CollectFund {
     }
 
     /*Get days left in installment due date by proposal/loan id*/
-    function getDaysRemainingInInstallmentDue(bytes32 _proposalID) view returns(uint256) {
-        if (getProposalDueDate(_proposalID) > now) {
-            return (getProposalDueDate(_proposalID) - now);
+    function getDaysRemainingInInstallmentDue(bytes32 _proposalID, uint256 _ts) view returns(uint256) {
+        if (getProposalDueDate(_proposalID) > _ts) {
+            return (getProposalDueDate(_proposalID) - _ts);
         }
         else {
             return 0;
@@ -198,7 +198,7 @@ contract CollectFund {
     }
 
     /*Get funding as borrower if proposal was successful to be triggered by proposal owner by proposal id*/
-    function getMoneyAsBorrowerAfterDeadline(bytes32 _proposalID) payable afterDeadline(_proposalID) proposalGoalReached(_proposalID) checkProposalOwner(_proposalID) external {
+    function getMoneyAsBorrowerAfterDeadline(bytes32 _proposalID, uint256 _ts) payable afterDeadline(_proposalID, _ts) proposalGoalReached(_proposalID) checkProposalOwner(_proposalID) external {
         address proposalOwner = mapProposalWithOwner[_proposalID];
         BorrowerProposal storage currentProposal = mapProposalsWithProposalIDs[_proposalID];
         if (proposalOwner.send(currentProposal.fundingGoal)) {

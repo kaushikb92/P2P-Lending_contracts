@@ -34,8 +34,8 @@ contract PayInstallments is CollectFund {
         return mapInstallmentsWithProposal[_proposalID].installmentAmount;
     }
 
-    function getDueInstallment(bytes32 _proposalID) view returns (uint256 _installment, uint256 _nextDueDate, uint8 _remainingTenure) { 
-        if (getDaysRemainingInInstallmentDue(_proposalID) > 0) {
+    function getDueInstallment(bytes32 _proposalID, uint256 _ts) view returns (uint256 _installment, uint256 _nextDueDate, uint8 _remainingTenure) { 
+        if (getDaysRemainingInInstallmentDue(_proposalID,_ts) > 0) {
             return (mapInstallmentsWithProposal[_proposalID].installmentAmount,getProposalDueDate(_proposalID),getProposalTenure(_proposalID)) ;
         }
         else {
@@ -43,11 +43,11 @@ contract PayInstallments is CollectFund {
         }
     }
 
-    function payInstallment(bytes32 _proposalID) payable checkProposalOwner(_proposalID) checkInstallmentTenure(_proposalID) proposalGoalReached(_proposalID) {
+    function payInstallment(bytes32 _proposalID, uint256 _ts) payable checkProposalOwner(_proposalID) checkInstallmentTenure(_proposalID) proposalGoalReached(_proposalID) {
         Installment storage currentInstallment = mapInstallmentsWithProposal[_proposalID];
         LenderInfo storage currentLenderInfo;
         uint256 getCurrentInstallment;
-        (getCurrentInstallment,,) = getDueInstallment(_proposalID);
+        (getCurrentInstallment,,) = getDueInstallment(_proposalID, _ts);
         if (msg.value == getCurrentInstallment) {
             for (i = 0; i < mapLendersWithProposal[_proposalID].length ; i++) {
             address currentLender = mapLendersWithProposal[_proposalID][i];
